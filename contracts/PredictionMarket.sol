@@ -134,6 +134,7 @@ contract PredictionMarket {
 
   // governance
   uint256 public fee; // fee % taken from every transaction
+  address public treasury;
   // realitio configs
   address public realitioAddress;
   uint256 public realitioTimeout;
@@ -183,7 +184,8 @@ contract PredictionMarket {
     IERC20 _token,
     uint256 _requiredBalance,
     address _realitioAddress,
-    uint256 _realitioTimeout
+    uint256 _realitioTimeout,
+    address _treasury
   ) public {
     require(_realitioAddress != address(0), "_realitioAddress is address 0");
     require(_realitioTimeout > 0, "timeout must be positive");
@@ -193,6 +195,7 @@ contract PredictionMarket {
     requiredBalance = _requiredBalance;
     realitioAddress = _realitioAddress;
     realitioTimeout = _realitioTimeout;
+    treasury = _treasury;
   }
 
   // ------ Core Functions ------
@@ -317,7 +320,11 @@ contract PredictionMarket {
 
     // subtracting fee from transaction value
     uint256 feeAmount = value.mul(market.fees.value) / ONE;
-    market.fees.poolWeight = market.fees.poolWeight.add(feeAmount);
+    market.fees.poolWeight = market.fees.poolWeight.add(feeAmount / 2);
+    {
+      (bool sent,) = payable(treasury).call{ value: feeAmount - feeAmount / 2 }("");
+      require(sent, "PredictionMarket: fail to send value to platform fee address");
+    }
     uint256 valueMinusFees = value.sub(feeAmount);
 
     MarketOutcome storage outcome = market.outcomes[outcomeId];
@@ -353,7 +360,11 @@ contract PredictionMarket {
 
     // adding fee to transaction value
     uint256 feeAmount = value.mul(market.fees.value) / (ONE.sub(fee));
-    market.fees.poolWeight = market.fees.poolWeight.add(feeAmount);
+    market.fees.poolWeight = market.fees.poolWeight.add(feeAmount / 2);
+    {
+      (bool sent,) = payable(treasury).call{ value: feeAmount - feeAmount / 2 }("");
+      require(sent, "PredictionMarket: fail to send value to platform fee address");
+    }
     uint256 valuePlusFees = value.add(feeAmount);
 
     require(market.balance >= valuePlusFees, "market does not have enough balance");
